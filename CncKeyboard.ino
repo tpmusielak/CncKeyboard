@@ -18,36 +18,42 @@ int rows[] = {row_0, row_1, row_2};
 bool readout[3][3] ;
 bool prev_readout[3][3] ;
 
-char keys[3][3] = {
-
-
-  {'7','8','9'},
-    {'4','5','6'},
-      {'1','2','3'}
-};
-
-void tur()
-{  
-  Serial.println("tur");
-}
-
-void zebra()
-{  
-  Serial.println("zebra");
-  //Keyboard.print("zebra");
-}
-
 bool changed = false;
 
-void (*funcs[3][3])() = {
-  {zebra, zebra, tur},
-  {tur, tur, tur},
-  {tur, zebra, zebra}
-};
+byte enabled = 0;
+byte disabled = 0;
 
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
+byte enabled_keys[9];
+byte disabled_keys[9];
+
+void onEnabled(const byte key) {
+	switch (key)
+	{
+	case 0:
+		Keyboard.press(KEY_LEFT_SHIFT);		
+		break;
+	default:
+		Serial.print("Key pressed: ");
+		Serial.println(key);
+		break;
+	}
+	
+}
+
+void onDisabled(const byte key) {	
+	switch (key)
+	{
+	case 0:		
+		Keyboard.release(KEY_LEFT_SHIFT);			
+		break;
+	default:
+		Serial.print("Key released: ");
+		Serial.println(key);
+		break;
+	}
+}
+
+void setup() {    
   for(int i = 0; i < col_count; i++)
   {
     pinMode(columns[i], OUTPUT);
@@ -65,6 +71,8 @@ void setup() {
       readout[i][j] = false;
     }
   }
+
+  Serial.begin(9600);
 }
 
 void readState()
@@ -72,46 +80,60 @@ void readState()
   for(int i = 0; i < col_count; i++)
   {
     digitalWrite(columns[i], HIGH);
-    for(int j = 0; j < row_count; j++)
+    
+	for(int j = 0; j < row_count; j++)
     {   
       bool pinRead = digitalRead(rows[j]);
-      if(!changed && (pinRead != readout[i][j]))
-      {
-        changed = true;
-      }      
-      readout[i][j] = pinRead;
+	  bool previousReadout = readout[i][j];      
+
+	  if (pinRead != previousReadout)
+	  {
+		  byte key_number = row_count * i + j;
+		  changed = true;
+
+		  if(pinRead) // Enabled
+		  { 
+			  enabled_keys[enabled] = key_number;
+			  ++enabled;			  
+		  }
+		  else // Disabled
+		  {
+			  disabled_keys[disabled] = key_number;
+			  ++disabled;
+		  }
+	  }
+
+	  readout[i][j] = pinRead;
     }   
     digitalWrite(columns[i], LOW);
   }
 }
 
-void printReadout()
+void actionState()
 {
   if(!changed)
   {
     return;
   }
   
-  String state = "";
-  for(int i = 0; i < col_count; i++)
+  for (byte i = 0; i < enabled; ++i)
   {
-    for(int j = 0; j < row_count; j++)
-    {      
-      if(readout[i][j])
-      {
-        //Keyboard.write(keys[i][j]);
-        state += keys[i][j];
-        (*funcs[i][j])();
-        
-      }      
-    }
+	  
+	  onEnabled(enabled_keys[i]);
   }
-  Serial.println(state);  
+  
+  for (byte i = 0; i < disabled; ++i)
+  {	  
+	  onDisabled(disabled_keys[i]);
+  } 
+  
   changed = false;
+  enabled = 0;
+  disabled = 0;
 }
 
 void loop() {
   readState();  
-  printReadout();
+  actionState();
   delay(50);
 }
