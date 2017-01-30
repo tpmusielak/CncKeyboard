@@ -1,19 +1,18 @@
 #include <Keyboard.h>
 
-int col_0 = 2;
-int col_1 = 3;
-int col_2 = 4;
+#define COLUMN_0 2
+#define COLUMN_1 3
+#define COLUMN_2 4
+
+#define ROW_0 8
+#define ROW_1 9
+#define ROW_2 10
 
 int col_count = 3;
-
-int row_0 = 8;
-int row_1 = 9;
-int row_2 = 10;
-
 int row_count = 3;
 
-int columns[] = { col_0, col_1, col_2 };
-int rows[] = { row_0, row_1, row_2 };
+int columns[] = { COLUMN_0, COLUMN_1, COLUMN_2 };
+int rows[] = { ROW_0, ROW_1, ROW_2};
 
 bool readout[3][3];
 bool prev_readout[3][3];
@@ -120,7 +119,6 @@ void actionState()
 
    for (byte i = 0; i < enabled; ++i)
    {
-
       onEnabled(enabled_keys[i]);
    }
 
