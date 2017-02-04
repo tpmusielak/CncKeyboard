@@ -1,140 +1,224 @@
 #include <Keyboard.h>
 
-#define COLUMN_0 2
-#define COLUMN_1 3
-#define COLUMN_2 4
+#define DEBUG_MODE 0
 
-#define ROW_0 8
-#define ROW_1 9
-#define ROW_2 10
+#define COLUMN_0 9
+#define COLUMN_1 8
+#define COLUMN_2 7
+#define COLUMN_3 6
 
-int col_count = 3;
-int row_count = 3;
+#define ROW_0 2
+#define ROW_1 3
+#define ROW_2 4
+#define ROW_3 5
 
-int columns[] = { COLUMN_0, COLUMN_1, COLUMN_2 };
-int rows[] = { ROW_0, ROW_1, ROW_2};
+#define COLUMNS 4
+#define ROWS 4
 
-bool readout[3][3];
-bool prev_readout[3][3];
+#define KEY_SPACE 0x20
+
+// Key - input mapping
+#define SPACE          0
+#define XY_DOWN        1
+#define XY_LEFT        2
+#define XY_RIGHT       3
+#define XY_UP         15
+#define Z_DOWN         4
+#define Z_UP           5
+
+int columns[] = { COLUMN_0, COLUMN_1, COLUMN_2, COLUMN_3 };
+int rows[] = { ROW_0, ROW_1, ROW_2, ROW_3 };
+
+bool readout[COLUMNS][ROWS];
+bool prev_readout[COLUMNS][ROWS];
 
 bool changed = false;
 
 byte enabled = 0;
 byte disabled = 0;
 
-byte enabled_keys[9];
-byte disabled_keys[9];
+byte enabled_keys[ROWS * COLUMNS];
+byte disabled_keys[ROWS * COLUMNS];
+
+void pressKey(const byte key)
+{
+  Keyboard.press(key);
+}
+
+void releaseKey(const byte key)
+{
+  Keyboard.release(key);
+}
+
+byte getInputNumber(const byte row, const byte column)
+{
+  return row * COLUMNS + column;
+}
 
 void onEnabled(const byte key)
 {
-   switch (key)
-   {
-   case 0:
-      Keyboard.press(KEY_LEFT_SHIFT);
-      break;
-   default:
-      Serial.print("Key pressed: ");
-      Serial.println(key);
-      break;
-   }
+  onChange(key, &pressKey);
 }
 
 void onDisabled(const byte key)
 {
-   switch (key)
-   {
-   case 0:
-      Keyboard.release(KEY_LEFT_SHIFT);
-      break;
-   default:
-      Serial.print("Key released: ");
-      Serial.println(key);
-      break;
-   }
+  onChange(key, &releaseKey);
 }
 
-void setup() 
+void onChange(const byte key, void (*action)(byte))
 {
-   for (int i = 0; i < col_count; i++)
-   {
-      pinMode(columns[i], OUTPUT);
-      digitalWrite(columns[i], LOW);
-   }
-   for (int i = 0; i < row_count; i++)
-   {
-      pinMode(rows[i], INPUT_PULLUP);
-   }
+  switch (key)
+  {
+    case SPACE:
+      action(KEY_SPACE);
+      break;
+    case XY_DOWN:
+      action(KEY_DOWN_ARROW);
+      break;
+    case XY_UP:
+      action(KEY_UP_ARROW);
+      break;
+    case XY_LEFT:
+      action(KEY_LEFT_ARROW);
+      break;
+    case XY_RIGHT:
+      action(KEY_RIGHT_ARROW);
+      break;
+    case Z_UP:
+      action(KEY_PAGE_UP);
+      break;
+    case Z_DOWN:
+      action(KEY_PAGE_DOWN);
+      break;
+    default:
+      break;
+  }
 
-   for (int i = 0; i < col_count; i++)
-   {
-      for (int j = 0; j < row_count; j++)
-      {
-         readout[i][j] = false;
-      }
-   }
+  if (DEBUG_MODE)
+  {
+    Serial.print("Key state changed: ");
+    Serial.println(key);
+  }
 
-   Serial.begin(9600);
+}
+
+void setup()
+{
+  for (int i = 0; i < COLUMNS; i++)
+  {
+    pinMode(columns[i], OUTPUT);
+    digitalWrite(columns[i], LOW);
+  }
+  for (int i = 0; i < ROWS; i++)
+  {
+    pinMode(rows[i], INPUT_PULLUP);
+  }
+
+  for (int i = 0; i < COLUMNS; i++)
+  {
+    for (int j = 0; j < ROWS; j++)
+    {
+      readout[i][j] = false;
+    }
+  }
+
+  if (DEBUG_MODE)
+  {
+    Serial.begin(9600);
+  }
+
 }
 
 void readState()
 {
-   for (int i = 0; i < col_count; i++)
-   {
-      digitalWrite(columns[i], HIGH);
+  for (int i = 0; i < COLUMNS; i++)
+  {
+    digitalWrite(columns[i], HIGH);
 
-      for (int j = 0; j < row_count; j++)
+    for (int j = 0; j < ROWS; j++)
+    {
+      bool pinRead = digitalRead(rows[j]);
+      bool previousReadout = readout[i][j];
+
+      if (pinRead != previousReadout)
       {
-         bool pinRead = digitalRead(rows[j]);
-         bool previousReadout = readout[i][j];
+        byte key_number = getInputNumber(j, i);
+        changed = true;
 
-         if (pinRead != previousReadout)
-         {
-            byte key_number = row_count * i + j;
-            changed = true;
-
-            if (pinRead) // Enabled
-            {
-               enabled_keys[enabled] = key_number;
-               ++enabled;
-            }
-            else // Disabled
-            {
-               disabled_keys[disabled] = key_number;
-               ++disabled;
-            }
-         }
-
-         readout[i][j] = pinRead;
+        if (pinRead) // Enabled
+        {
+          enabled_keys[enabled] = key_number;
+          ++enabled;
+        }
+        else // Disabled
+        {
+          disabled_keys[disabled] = key_number;
+          ++disabled;
+        }
       }
-      digitalWrite(columns[i], LOW);
-   }
+
+      readout[i][j] = pinRead;
+    }
+    digitalWrite(columns[i], LOW);
+  }
 }
 
 void actionState()
 {
-   if (!changed)
-   {
-      return;
-   }
+  if (!changed)
+  {
+    return;
+  }
 
-   for (byte i = 0; i < enabled; ++i)
-   {
-      onEnabled(enabled_keys[i]);
-   }
+  for (byte i = 0; i < enabled; ++i)
+  {
+    onEnabled(enabled_keys[i]);
+  }
 
-   for (byte i = 0; i < disabled; ++i)
-   {
-      onDisabled(disabled_keys[i]);
-   }
+  for (byte i = 0; i < disabled; ++i)
+  {
+    onDisabled(disabled_keys[i]);
+  }
 
-   changed = false;
-   enabled = 0;
-   disabled = 0;
+  changed = false;
+  enabled = 0;
+  disabled = 0;
+}
+
+unsigned long previousMillis = 0;
+long debugInterval = 1000;
+
+void printDiagnostics()
+{
+  if (!DEBUG_MODE)
+  {
+    return;
+  }
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= debugInterval)
+  {
+    String state;
+    for (int i = 0; i < ROWS; i++)
+    {
+      for (int j = 0; j < COLUMNS; j++)
+      {
+        readout[j][i] ? state += getInputNumber(i, j    ) : state += ". ";
+      }
+    }
+    Serial.println(state);
+
+    previousMillis = currentMillis;
+  }
 }
 
 void loop()
 {
-   readState();
-   actionState();
-   delay(50);
+  readState();
+  actionState();
+  printDiagnostics();
+  delay(50);
 }
+
+
+
