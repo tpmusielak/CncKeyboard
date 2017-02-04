@@ -25,6 +25,10 @@
 #define XY_UP         15
 #define Z_DOWN         4
 #define Z_UP           5
+#define SPEED_10       6
+#define SPEED_1        8
+#define SPEED_01      11
+#define ESCAPE         7
 
 int columns[] = { COLUMN_0, COLUMN_1, COLUMN_2, COLUMN_3 };
 int rows[] = { ROW_0, ROW_1, ROW_2, ROW_3 };
@@ -90,13 +94,26 @@ void onChange(const byte key, void (*action)(byte))
     case Z_DOWN:
       action(KEY_PAGE_DOWN);
       break;
+    case SPEED_10:
+      action(KEY_RIGHT_CTRL);
+      action(KEY_RIGHT_SHIFT);
+      break;
+    case SPEED_1:
+      action(KEY_RIGHT_SHIFT);
+      break;
+    case SPEED_01:
+      action(KEY_RIGHT_CTRL);
+      break;
+    case ESCAPE:
+      action(KEY_ESC);    
+      break;
     default:
       break;
   }
 
   if (DEBUG_MODE)
   {
-    Serial.print("Key state changed: ");
+      Serial.print("Key state changed: ");
     Serial.println(key);
   }
 
