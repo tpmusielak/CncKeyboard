@@ -234,7 +234,7 @@ void loop()
   readState();
   actionState();
   printDiagnostics();
-  delay(50);
+  delay(200);
 }
 
 
