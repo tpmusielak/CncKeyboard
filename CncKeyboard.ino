@@ -1,6 +1,6 @@
 #include <Keyboard.h>
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 #define COLUMN_0 9
 #define COLUMN_1 8
@@ -150,8 +150,6 @@ const unsigned long debounceTimeMs = 10;
 unsigned long lastChanged = 0;
 bool readoutChanged = false;
 
-
-
 void readState()
 {
   for (int i = 0; i < COLUMNS; i++)
@@ -221,12 +219,21 @@ void detectChanges()
   }  
 }
 
+const unsigned long actionDelayMs = 100;
+unsigned long lastActioned = 0;
+
 void actionState()
 {
   if (!changed)
   {
     return;
   }  
+
+  unsigned long now = millis();
+  if(now - lastActioned < actionDelayMs)
+  {
+    return;
+  }    
 
   for (byte i = 0; i < enabled; ++i)
   {
@@ -241,6 +248,7 @@ void actionState()
   changed = false;
   enabled = 0;
   disabled = 0;
+  lastActioned = now;
 }
 
 unsigned long previousMillis = 0;
