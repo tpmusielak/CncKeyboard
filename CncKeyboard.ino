@@ -1,6 +1,6 @@
 #include <Keyboard.h>
 
-#define DEBUG_MODE 0
+#define DEBUG_MODE
 
 #define COLUMN_0 9
 #define COLUMN_1 8
@@ -29,12 +29,13 @@
 #define SPEED_1        8
 #define SPEED_01      11
 #define ESCAPE         7
+#define F1            14
 
 int columns[] = { COLUMN_0, COLUMN_1, COLUMN_2, COLUMN_3 };
 int rows[] = { ROW_0, ROW_1, ROW_2, ROW_3 };
 
 bool readout[COLUMNS][ROWS];
-bool prev_readout[COLUMNS][ROWS];
+bool temp_readout[COLUMNS][ROWS];
 
 bool changed = false;
 
@@ -107,16 +108,17 @@ void onChange(const byte key, void (*action)(byte))
     case ESCAPE:
       action(KEY_ESC);    
       break;
+    case F1:
+      action(KEY_F1);
+      break;
     default:
       break;
   }
-
-  if (DEBUG_MODE)
-  {
-      Serial.print("Key state changed: ");
-    Serial.println(key);
-  }
-
+  
+  #ifdef DEBUG_MODE
+  Serial.print("Key state changed: ");
+  Serial.println(key);
+  #endif 
 }
 
 void setup()
@@ -139,12 +141,16 @@ void setup()
     }
   }
 
-  if (DEBUG_MODE)
-  {
-    Serial.begin(9600);
-  }
-
+  #ifdef DEBUG_MODE  
+  Serial.begin(9600);
+  #endif
 }
+
+const unsigned long debounceTimeMs = 10;
+unsigned long lastChanged = 0;
+bool readoutChanged = false;
+
+
 
 void readState()
 {
@@ -155,8 +161,44 @@ void readState()
     for (int j = 0; j < ROWS; j++)
     {
       bool pinRead = digitalRead(rows[j]);
-      bool previousReadout = readout[i][j];
+      bool previousReadout = temp_readout[i][j];
 
+      if(pinRead != previousReadout)
+      {
+        readoutChanged = true;
+      }
+      
+      temp_readout[i][j] = pinRead;      
+    }
+    digitalWrite(columns[i], LOW);
+  } 
+}
+
+void detectChanges()
+{
+  // No changes;
+  if(!readoutChanged)
+  {
+    return;
+  }
+
+  unsigned long now = millis();
+  // Changes need to be debounced;
+  if(now - lastChanged < debounceTimeMs)
+  {
+    return;
+  }
+
+  // Convert changes to state;    
+  readoutChanged = false;
+  lastChanged = now;
+  
+  for (int i = 0; i < COLUMNS; i++)
+  {
+    for (int j = 0; j < ROWS; j++)
+    {
+      bool pinRead = temp_readout[i][j];
+      bool previousReadout = readout[i][j];
       if (pinRead != previousReadout)
       {
         byte key_number = getInputNumber(j, i);
@@ -172,12 +214,11 @@ void readState()
           disabled_keys[disabled] = key_number;
           ++disabled;
         }
-      }
 
-      readout[i][j] = pinRead;
+        readout[i][j] = pinRead; // Overwrite old readout;
+      }    
     }
-    digitalWrite(columns[i], LOW);
-  }
+  }  
 }
 
 void actionState()
@@ -185,7 +226,7 @@ void actionState()
   if (!changed)
   {
     return;
-  }
+  }  
 
   for (byte i = 0; i < enabled; ++i)
   {
@@ -205,13 +246,9 @@ void actionState()
 unsigned long previousMillis = 0;
 long debugInterval = 1000;
 
+#ifdef DEBUG_MODE
 void printDiagnostics()
 {
-  if (!DEBUG_MODE)
-  {
-    return;
-  }
-
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= debugInterval)
   {
@@ -228,13 +265,17 @@ void printDiagnostics()
     previousMillis = currentMillis;
   }
 }
+#endif
 
 void loop()
 {
   readState();
+  detectChanges();
   actionState();
+  
+  #ifdef DEBUG_MODE
   printDiagnostics();
-  delay(250);
+  #endif
 }
 
 
